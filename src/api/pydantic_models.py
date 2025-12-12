@@ -9,15 +9,16 @@ from typing import Optional, List
 
 class PredictionRequest(BaseModel):
     """Request model for single prediction"""
+
     id: Optional[str] = Field(None, description="Optional request identifier")
-    
+
     # Add your actual feature fields here
     # Example features (adjust based on your model):
     # age: float = Field(..., description="Age of the applicant")
     # income: float = Field(..., description="Annual income")
     # credit_score: float = Field(..., description="Credit score")
     # loan_amount: float = Field(..., description="Loan amount requested")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -29,26 +30,34 @@ class PredictionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Response model for prediction"""
+
     id: Optional[str] = Field(None, description="Request identifier")
-    prediction: int = Field(..., description="Binary prediction (0=No Default, 1=Default)")
-    default_probability: float = Field(..., ge=0.0, le=1.0, description="Probability of default")
+    prediction: int = Field(
+        ..., description="Binary prediction (0=No Default, 1=Default)"
+    )
+    default_probability: float = Field(
+        ..., ge=0.0, le=1.0, description="Probability of default"
+    )
     risk_level: str = Field(..., description="Risk level: Low, Medium, or High")
-    
+
     class Config:
         schema_extra = {
             "example": {
                 "id": "req_001",
                 "prediction": 0,
                 "default_probability": 0.25,
-                "risk_level": "Low"
+                "risk_level": "Low",
             }
         }
 
 
 class BatchPredictionRequest(BaseModel):
     """Request model for batch predictions"""
-    records: List[PredictionRequest] = Field(..., description="List of prediction requests")
-    
+
+    records: List[PredictionRequest] = Field(
+        ..., description="List of prediction requests"
+    )
+
     class Config:
         schema_extra = {
             "example": {
@@ -60,8 +69,7 @@ class BatchPredictionRequest(BaseModel):
                     {
                         "id": "req_002",
                         # Add example features
-                    }
+                    },
                 ]
             }
         }
-
