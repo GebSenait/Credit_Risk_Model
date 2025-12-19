@@ -267,6 +267,118 @@ Developed an automated, comprehensive EDA notebook that systematically analyzes:
 
 ---
 
+### Task 3: Feature Engineering
+
+#### Problem Statement
+
+Transform raw transaction data into a model-ready dataset through systematic feature engineering, ensuring reproducibility, automation, and compatibility with downstream machine learning pipelines.
+
+#### Solution Approach
+
+Implemented a comprehensive, automated feature engineering pipeline using scikit-learn's Pipeline and ColumnTransformer that systematically transforms raw data through multiple stages: aggregate feature creation, temporal extraction, categorical encoding, missing value handling, numerical scaling, and Weight of Evidence (WoE) transformations. The pipeline is designed to be deterministic, reusable between training and inference, and fully integrated with the scikit-learn ecosystem.
+
+#### Implementation Details
+
+**Feature Engineering Pipeline (`src/data_processing.py`):**
+
+The pipeline implements a multi-stage transformation process:
+
+1. **Customer-Level Aggregate Features**
+   - Creates customer-level statistical aggregations using `CustomerAggregateFeatures` transformer
+   - Generates: total transaction amount, average transaction amount, transaction count, and standard deviation of amounts per customer
+   - Provides behavioral insights that capture customer transaction patterns and spending variability
+   - Handles new customers during inference by defaulting to zero values
+
+2. **Temporal Feature Extraction**
+   - Extracts time-based features from transaction timestamps using `TemporalFeatureExtractor`
+   - Derives: transaction hour, day of month, month, and year
+   - Enables the model to capture time-dependent patterns and seasonal behaviors
+   - Handles datetime parsing with error tolerance for robust processing
+
+3. **Categorical Feature Encoding**
+   - Implements dual encoding strategy through sklearn's ColumnTransformer
+   - One-Hot Encoding: Applied to categorical features with moderate cardinality, creating binary indicator variables
+   - Label Encoding: Available for high-cardinality categoricals (configurable)
+   - Maintains encoding consistency between training and inference through fitted transformers
+   - Handles unknown categories gracefully during inference
+
+4. **Missing Value Handling**
+   - Systematic imputation integrated into the preprocessing pipeline
+   - Numerical features: Median imputation using `SimpleImputer`
+   - Categorical features: Mode imputation (most frequent category)
+   - Ensures data completeness without manual intervention
+
+5. **Numerical Feature Scaling**
+   - StandardScaler (Z-score normalization) applied to all numerical features
+   - Centers features around zero and scales to unit variance
+   - Prevents features with larger magnitudes from dominating model training
+   - Ensures balanced contribution from all numerical features
+
+6. **Weight of Evidence (WoE) and Information Value (IV)**
+   - Custom `WoETransformer` implements WoE encoding for categorical features
+   - WoE transformation: Replaces categorical values with log odds ratio of events vs. non-events
+   - IV calculation: Quantifies predictive power of each categorical feature
+   - Applied selectively to categoricals with reasonable cardinality (< 50 unique values)
+   - Provides interpretable, risk-based encoding particularly valuable for credit risk modeling
+
+**Pipeline Architecture:**
+
+- **Modular Design**: Each transformation stage is implemented as a scikit-learn compatible transformer (BaseEstimator, TransformerMixin)
+- **Reproducibility**: All transformations are deterministic and preserve state between training and inference
+- **Pipeline Integration**: Uses sklearn Pipeline and ColumnTransformer for seamless chaining
+- **Separation of Concerns**: Numerical, categorical, and WoE transformations are clearly separated
+- **State Management**: Fitted transformers are stored in the DataProcessor instance for reuse during inference
+
+**Key Features:**
+- Fully automated: Single method call (`preprocess()`) handles all transformations
+- Deterministic: Same input always produces same output
+- Inference-ready: Pipeline state persists for consistent transformation of new data
+- Scalable: Efficient handling of large datasets through vectorized operations
+
+#### Results & Insights
+
+✅ **Feature Engineering Completed:**
+- Customer-level behavioral features capturing spending patterns and transaction frequency
+- Temporal features enabling time-based pattern recognition
+- Categorically encoded features in multiple formats (One-Hot, WoE) optimized for different modeling needs
+- Numerically scaled features ensuring balanced model learning
+- Comprehensive preprocessing pipeline ready for model training
+
+✅ **Key Findings:**
+
+1. **Customer Behavior Insights**
+   - Aggregate features reveal spending patterns and transaction frequency distributions
+   - Standard deviation of amounts captures customer spending variability, potentially indicative of risk patterns
+
+2. **Temporal Patterns**
+   - Extracted time features enable discovery of time-of-day, day-of-month, and seasonal patterns
+   - Transaction timing features can capture behavioral anomalies related to fraud or risk
+
+3. **WoE Transformation Value**
+   - WoE encoding provides interpretable, risk-calibrated representation of categorical features
+   - Information Value metrics help identify the most predictive categorical features
+   - WoE features often improve model performance in credit risk applications
+
+4. **Pipeline Efficiency**
+   - Single-pass transformation reduces computational overhead
+   - Pipeline state management ensures consistency between training and production inference
+   - Modular design allows easy addition or modification of transformation steps
+
+5. **Data Quality Enhancement**
+   - Systematic missing value handling ensures complete datasets
+   - Scaling normalizes feature distributions, improving model convergence
+   - Encoding strategies handle categorical variables appropriately for different algorithm types
+
+✅ **Technical Achievements:**
+- Production-ready pipeline compatible with sklearn ecosystem
+- Fully documented and modular transformer implementations
+- Robust error handling and logging throughout the transformation process
+- Backward compatibility maintained with existing DataProcessor interface
+
+**Deliverable:** Complete feature engineering pipeline in `src/data_processing.py` with automated transformation capabilities, processed datasets saved to `data/processed/`, and comprehensive documentation of strategies and insights.
+
+---
+
 ## 📊 Usage Guide
 
 ### Running the EDA
@@ -279,13 +391,40 @@ Execute all cells sequentially to perform the complete exploratory data analysis
 
 ### Data Processing
 
+The feature engineering pipeline automatically handles all transformations:
+
 ```python
 from src.data_processing import DataProcessor
 
-processor = DataProcessor(data_path="data/raw")
+# Initialize processor
+processor = DataProcessor(
+    data_path="data/raw",
+    target_column="FraudResult",
+    use_woe=True,  # Enable WoE transformations
+)
+
+# Load raw data
 df = processor.load_data("credit_data.csv")
-X, y = processor.preprocess(df, target_column='FraudResult')
+
+# Preprocess with full feature engineering pipeline
+# fit_pipeline=True for training, False for inference
+X, y = processor.preprocess(df, fit_pipeline=True)
+
+# Save processed data
+processor.save_processed_data(
+    X, y, 
+    filename="processed_credit_data.csv",
+    output_path="data/processed"
+)
 ```
+
+The pipeline automatically:
+- Creates customer-level aggregate features
+- Extracts temporal features from timestamps
+- Applies WoE transformations to categorical features
+- Handles missing values
+- Encodes categorical variables
+- Scales numerical features
 
 ### Model Training
 
