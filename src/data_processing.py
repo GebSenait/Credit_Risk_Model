@@ -527,7 +527,10 @@ class DataProcessor:
         return Pipeline([("preprocessor", preprocessor)])
 
     def preprocess(
-        self, df: pd.DataFrame, fit_pipeline: bool = True
+        self,
+        df: pd.DataFrame,
+        target_column: Optional[str] = None,
+        fit_pipeline: bool = True,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Preprocess data for model training using comprehensive feature engineering
@@ -535,6 +538,8 @@ class DataProcessor:
 
         Args:
             df: Input DataFrame
+            target_column: Name of target column (optional, uses self.target_column
+                if not provided for backward compatibility)
             fit_pipeline: Whether to fit the pipeline (True for training,
                 False for inference)
 
@@ -543,12 +548,17 @@ class DataProcessor:
         """
         logger.info("Starting comprehensive feature engineering pipeline...")
 
-        # Separate target
-        if self.target_column not in df.columns:
-            raise ValueError(f"Target column '{self.target_column}' not found in data")
+        # Use provided target_column or fall back to instance variable
+        target_col = (
+            target_column if target_column is not None else self.target_column
+        )
 
-        X = df.drop(columns=[self.target_column])
-        y = df[self.target_column]
+        # Separate target
+        if target_col not in df.columns:
+            raise ValueError(f"Target column '{target_col}' not found in data")
+
+        X = df.drop(columns=[target_col])
+        y = df[target_col]
 
         # Step 1: Create customer-level aggregate features
         logger.info("Step 1: Creating customer-level aggregate features...")
@@ -560,7 +570,9 @@ class DataProcessor:
 
         # Step 2: Extract temporal features
         logger.info("Step 2: Extracting temporal features...")
-        temporal_transformer = TemporalFeatureExtractor(timestamp_col="TransactionStartTime")
+        temporal_transformer = TemporalFeatureExtractor(
+            timestamp_col="TransactionStartTime"
+        )
         X = temporal_transformer.transform(X)
 
         # Step 3: Apply WoE transformations if enabled
@@ -593,9 +605,13 @@ class DataProcessor:
                 else:
                     # Use existing fitted transformer for inference
                     if self.woe_transformer_ is None:
-                        logger.warning("WoE transformer not fitted. Skipping WoE transformation.")
+                        logger.warning(
+                            "WoE transformer not fitted. Skipping WoE transformation."
+                        )
                     else:
-                        logger.info("Using pre-fitted WoE transformer for transformation")
+                        logger.info(
+                            "Using pre-fitted WoE transformer for transformation"
+                        )
                         X = self.woe_transformer_.transform(X)
 
         # Step 4: Identify final feature sets after feature engineering
@@ -639,7 +655,9 @@ class DataProcessor:
         feature_names = (
             self.feature_pipeline_.named_steps["preprocessor"].get_feature_names_out()
         )
-        X_transformed_df = pd.DataFrame(X_transformed, columns=feature_names, index=X.index)
+        X_transformed_df = pd.DataFrame(
+            X_transformed, columns=feature_names, index=X.index
+        )
 
         # Store feature names
         self.feature_names_ = list(X_transformed_df.columns)
@@ -698,7 +716,24 @@ class DataProcessor:
             "clean_data() is deprecated. Missing value handling is now part "
             "of the preprocessing pipeline."
         )
-        return df.copy()
+        df_clean = df.copy()
+
+        # Handle missing values for backward compatibility
+        # For numerical columns, fill with median
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df_clean[col].isnull().sum() > 0:
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+
+        # For categorical columns, fill with mode
+        categorical_cols = df_clean.select_dtypes(include=["object"]).columns
+        for col in categorical_cols:
+            if df_clean[col].isnull().sum() > 0:
+                mode_value = df_clean[col].mode()
+                fill_value = mode_value[0] if len(mode_value) > 0 else "Unknown"
+                df_clean[col].fillna(fill_value, inplace=True)
+
+        return df_clean
 
     def engineer_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
