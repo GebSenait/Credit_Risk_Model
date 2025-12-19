@@ -550,9 +550,7 @@ class DataProcessor:
 
         # Use provided target_column or fall back to instance variable
         target_col = (
-            target_column
-            if target_column is not None
-            else self.target_column
+            target_column if target_column is not None else self.target_column
         )
 
         # Separate target
