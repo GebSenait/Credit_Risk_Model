@@ -21,6 +21,7 @@ from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
 )
+from sklearn.cluster import KMeans
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO)
@@ -662,6 +663,224 @@ class DataProcessor:
         )
 
         return X_transformed_df, y
+
+    def create_proxy_target_variable(
+        self,
+        df: pd.DataFrame,
+        snapshot_date: Optional[str] = None,
+        customer_id_col: str = "CustomerId",
+        transaction_date_col: str = "TransactionStartTime",
+        amount_col: str = "Amount",
+        n_clusters: int = 3,
+        random_state: int = 42,
+    ) -> pd.DataFrame:
+        """
+        Create proxy target variable using RFM analysis and K-Means clustering.
+
+        This method identifies disengaged customers (high-risk proxies) by:
+        1. Calculating RFM metrics (Recency, Frequency, Monetary)
+        2. Clustering customers into segments using K-Means
+        3. Identifying the least engaged cluster as high-risk
+
+        Args:
+            df: Input DataFrame with transaction data
+            snapshot_date: Fixed snapshot date for Recency calculation (ISO format).
+                If None, uses the maximum transaction date in the dataset.
+            customer_id_col: Name of the customer ID column
+            transaction_date_col: Name of the transaction date column
+            amount_col: Name of the transaction amount column
+            n_clusters: Number of clusters for K-Means (default: 3)
+            random_state: Random state for reproducibility (default: 42)
+
+        Returns:
+            DataFrame with added 'is_high_risk' column (1 for high-risk, 0 otherwise)
+        """
+        logger.info("=" * 70)
+        logger.info("TASK 4: PROXY TARGET VARIABLE ENGINEERING")
+        logger.info("=" * 70)
+
+        # Make a copy to avoid modifying original
+        df_work = df.copy()
+
+        # Validate required columns
+        required_cols = [customer_id_col, transaction_date_col, amount_col]
+        missing_cols = [col for col in required_cols if col not in df_work.columns]
+        if missing_cols:
+            raise ValueError(
+                f"Missing required columns for RFM analysis: {missing_cols}"
+            )
+
+        logger.info(f"Calculating RFM metrics for {df_work[customer_id_col].nunique()} unique customers...")
+
+        # Convert transaction date to datetime
+        df_work[transaction_date_col] = pd.to_datetime(
+            df_work[transaction_date_col], errors="coerce"
+        )
+
+        # Determine snapshot date
+        if snapshot_date is None:
+            snapshot_date = df_work[transaction_date_col].max()
+            logger.info(
+                f"No snapshot date provided. Using maximum transaction date: {snapshot_date}"
+            )
+        else:
+            snapshot_date = pd.to_datetime(snapshot_date)
+            logger.info(f"Using provided snapshot date: {snapshot_date}")
+
+        # Calculate RFM metrics per customer
+        rfm_data = []
+
+        for customer_id in df_work[customer_id_col].unique():
+            customer_transactions = df_work[
+                df_work[customer_id_col] == customer_id
+            ].copy()
+
+            # Recency: Days since most recent transaction
+            most_recent_date = customer_transactions[transaction_date_col].max()
+            if pd.isna(most_recent_date):
+                recency_days = np.nan
+            else:
+                recency_days = (snapshot_date - most_recent_date).days
+
+            # Frequency: Number of transactions in observation window
+            frequency = len(customer_transactions)
+
+            # Monetary: Aggregate monetary value (using absolute value to handle refunds)
+            monetary = customer_transactions[amount_col].abs().sum()
+
+            rfm_data.append(
+                {
+                    customer_id_col: customer_id,
+                    "Recency": recency_days,
+                    "Frequency": frequency,
+                    "Monetary": monetary,
+                }
+            )
+
+        rfm_df = pd.DataFrame(rfm_data)
+
+        # Handle any NaN values (customers with invalid dates)
+        if rfm_df["Recency"].isna().any():
+            logger.warning(
+                f"Found {rfm_df['Recency'].isna().sum()} customers with invalid dates. "
+                "Filling with median recency."
+            )
+            rfm_df["Recency"] = rfm_df["Recency"].fillna(rfm_df["Recency"].median())
+
+        logger.info("RFM Metrics Summary:")
+        logger.info(f"  Recency: mean={rfm_df['Recency'].mean():.2f}, "
+                   f"median={rfm_df['Recency'].median():.2f}, "
+                   f"std={rfm_df['Recency'].std():.2f}")
+        logger.info(f"  Frequency: mean={rfm_df['Frequency'].mean():.2f}, "
+                   f"median={rfm_df['Frequency'].median():.2f}, "
+                   f"std={rfm_df['Frequency'].std():.2f}")
+        logger.info(f"  Monetary: mean={rfm_df['Monetary'].mean():.2f}, "
+                   f"median={rfm_df['Monetary'].median():.2f}, "
+                   f"std={rfm_df['Monetary'].std():.2f}")
+
+        # Prepare RFM features for clustering
+        rfm_features = rfm_df[["Recency", "Frequency", "Monetary"]].copy()
+
+        # Log transformation for Monetary (often highly skewed)
+        rfm_features["Monetary_log"] = np.log1p(rfm_features["Monetary"])
+
+        # Standardize features for clustering
+        scaler = StandardScaler()
+        rfm_scaled = scaler.fit_transform(
+            rfm_features[["Recency", "Frequency", "Monetary_log"]]
+        )
+
+        logger.info(f"Performing K-Means clustering with {n_clusters} clusters...")
+
+        # Perform K-Means clustering
+        kmeans = KMeans(
+            n_clusters=n_clusters,
+            random_state=random_state,
+            n_init=10,
+            max_iter=300,
+        )
+        rfm_df["Cluster"] = kmeans.fit_predict(rfm_scaled)
+
+        # Analyze cluster characteristics
+        logger.info("\nCluster Characteristics:")
+        cluster_summary = []
+        for cluster_id in sorted(rfm_df["Cluster"].unique()):
+            cluster_data = rfm_df[rfm_df["Cluster"] == cluster_id]
+            cluster_summary.append(
+                {
+                    "Cluster": cluster_id,
+                    "Count": len(cluster_data),
+                    "Recency_mean": cluster_data["Recency"].mean(),
+                    "Frequency_mean": cluster_data["Frequency"].mean(),
+                    "Monetary_mean": cluster_data["Monetary"].mean(),
+                }
+            )
+            logger.info(
+                f"  Cluster {cluster_id}: {len(cluster_data)} customers, "
+                f"Recency={cluster_data['Recency'].mean():.2f}, "
+                f"Frequency={cluster_data['Frequency'].mean():.2f}, "
+                f"Monetary={cluster_data['Monetary'].mean():.2f}"
+            )
+
+        cluster_summary_df = pd.DataFrame(cluster_summary)
+
+        # Identify high-risk cluster: highest recency, lowest frequency, lowest monetary
+        # Normalize each metric to [0, 1] range for fair comparison
+        recency_norm = (
+            (cluster_summary_df["Recency_mean"] - cluster_summary_df["Recency_mean"].min())
+            / (cluster_summary_df["Recency_mean"].max() - cluster_summary_df["Recency_mean"].min() + 1e-10)
+        )
+        frequency_norm = (
+            1 - (cluster_summary_df["Frequency_mean"] - cluster_summary_df["Frequency_mean"].min())
+            / (cluster_summary_df["Frequency_mean"].max() - cluster_summary_df["Frequency_mean"].min() + 1e-10)
+        )  # Inverted: lower frequency = higher risk
+        monetary_norm = (
+            1 - (cluster_summary_df["Monetary_mean"] - cluster_summary_df["Monetary_mean"].min())
+            / (cluster_summary_df["Monetary_mean"].max() - cluster_summary_df["Monetary_mean"].min() + 1e-10)
+        )  # Inverted: lower monetary = higher risk
+
+        # Composite risk score: higher = more disengaged = higher risk
+        cluster_summary_df["Risk_Score"] = (
+            recency_norm + frequency_norm + monetary_norm
+        )
+
+        high_risk_cluster = cluster_summary_df.loc[
+            cluster_summary_df["Risk_Score"].idxmax(), "Cluster"
+        ]
+
+        logger.info(
+            f"\nIdentified Cluster {high_risk_cluster} as high-risk cluster "
+            f"({len(rfm_df[rfm_df['Cluster'] == high_risk_cluster])} customers)"
+        )
+
+        # Create binary target variable
+        rfm_df["is_high_risk"] = (rfm_df["Cluster"] == high_risk_cluster).astype(int)
+
+        # Log target distribution
+        high_risk_count = rfm_df["is_high_risk"].sum()
+        high_risk_pct = (high_risk_count / len(rfm_df)) * 100
+        logger.info(
+            f"\nTarget Variable Distribution:"
+            f"\n  High-risk (is_high_risk=1): {high_risk_count} ({high_risk_pct:.2f}%)"
+            f"\n  Low-risk (is_high_risk=0): {len(rfm_df) - high_risk_count} ({100 - high_risk_pct:.2f}%)"
+        )
+
+        # Merge is_high_risk back to original dataframe
+        df_result = df_work.merge(
+            rfm_df[[customer_id_col, "is_high_risk"]],
+            on=customer_id_col,
+            how="left",
+        )
+
+        # Fill any missing values (shouldn't happen, but safety check)
+        df_result["is_high_risk"] = df_result["is_high_risk"].fillna(0).astype(int)
+
+        logger.info(
+            f"\nProxy target variable 'is_high_risk' successfully created and merged."
+        )
+        logger.info("=" * 70)
+
+        return df_result
 
     def save_processed_data(
         self,

@@ -10,6 +10,8 @@ A production-ready machine learning project for credit risk prediction, featurin
 - [Project Tasks](#project-tasks)
   - [Task 1: Project Setup & Infrastructure](#task-1-project-setup--infrastructure)
   - [Task 2: Exploratory Data Analysis (EDA)](#task-2-exploratory-data-analysis-eda)
+  - [Task 3: Feature Engineering](#task-3-feature-engineering)
+  - [Task 4: Proxy Target Variable Engineering](#task-4-proxy-target-variable-engineering)
 - [Usage Guide](#usage-guide)
 - [Testing](#testing)
 - [Deployment](#deployment)
@@ -379,6 +381,100 @@ The pipeline implements a multi-stage transformation process:
 
 ---
 
+### Task 4: Proxy Target Variable Engineering
+
+#### Problem Statement
+
+In the absence of an explicit default label, develop a data-driven, reproducible proxy for credit risk using customer engagement behavior. The proxy must be defensible, explainable, and suitable for downstream model training.
+
+#### Solution Approach
+
+Implemented a comprehensive RFM (Recency, Frequency, Monetary) analysis combined with K-Means clustering to identify disengaged customers as high-risk proxies. The approach systematically segments customers based on their transaction behavior and assigns binary risk labels through unsupervised learning, ensuring reproducibility and clear interpretability.
+
+#### Implementation Details
+
+**RFM Analysis (`src/data_processing.py` - `create_proxy_target_variable` method):**
+
+The implementation follows a three-stage process:
+
+1. **RFM Metrics Calculation**
+   - **Recency**: Days since the customer's most recent transaction, calculated relative to a fixed snapshot date (defaults to maximum transaction date in dataset)
+   - **Frequency**: Total number of transactions per customer within the observation window
+   - **Monetary**: Aggregate absolute monetary value of all transactions per customer
+   - All metrics are computed at the customer level, ensuring one record per customer
+   - Snapshot date is explicitly documented and fixed to prevent data leakage
+
+2. **Customer Segmentation via K-Means Clustering**
+   - Preprocessing: Log transformation applied to Monetary values to handle skewness, followed by StandardScaler normalization
+   - K-Means clustering with 3 clusters (configurable) and fixed `random_state=42` for reproducibility
+   - Clustering performed on standardized RFM features to ensure balanced contribution from all dimensions
+   - Cluster characteristics analyzed to understand behavioral patterns
+
+3. **High-Risk Cluster Identification**
+   - Composite risk score calculated for each cluster based on normalized RFM metrics
+   - Risk score formula: `normalized(Recency) + normalized(1-Frequency) + normalized(1-Monetary)`
+   - Higher scores indicate more disengaged customers (high recency, low frequency, low monetary value)
+   - Cluster with highest risk score identified as high-risk segment
+   - Binary target variable `is_high_risk` created: 1 for high-risk cluster, 0 for all others
+
+**Key Design Decisions:**
+
+- **Fixed Snapshot Date**: Ensures deterministic Recency calculations and prevents temporal data leakage
+- **Log Transformation**: Applied to Monetary values to handle highly skewed distributions common in transaction data
+- **Standardization**: RFM features standardized before clustering to prevent scale bias
+- **Reproducibility**: All random operations use fixed seeds (`random_state=42`)
+- **Interpretability**: Clear cluster characteristics logged for business understanding
+
+#### Results & Insights
+
+✅ **Proxy Target Variable Created:**
+
+The implementation successfully identifies customer segments with distinct engagement patterns:
+
+- **High-Risk Segment**: Characterized by high recency (long time since last transaction), low frequency (few transactions), and low monetary value (minimal spending)
+- **Target Distribution**: Binary classification with clear separation between engaged and disengaged customers
+- **Business Logic**: Disengaged customers represent higher credit risk as they demonstrate reduced platform interaction and lower transaction volumes
+
+✅ **Key Findings:**
+
+1. **Customer Segmentation Patterns**
+   - Three distinct behavioral clusters emerge from RFM analysis
+   - Clear separation between highly engaged, moderately engaged, and disengaged customers
+   - Cluster characteristics reveal meaningful business insights about customer lifecycle stages
+
+2. **Risk Proxy Validity**
+   - High-risk cluster demonstrates expected characteristics: infrequent transactions, low spending, and long time since last activity
+   - Proxy label aligns with business intuition: disengaged customers are more likely to default or churn
+   - Distribution provides sufficient positive class examples for model training
+
+3. **Reproducibility & Determinism**
+   - Fixed snapshot date ensures consistent Recency calculations across runs
+   - Random state seeding guarantees identical cluster assignments
+   - All transformations are deterministic and documented
+
+4. **Integration Readiness**
+   - Target variable seamlessly integrates with existing feature engineering pipeline
+   - Compatible with downstream model training workflows
+   - Maintains row-level alignment with original transaction data
+
+✅ **Business Implications:**
+
+- **Risk Identification**: Enables proactive identification of customers at risk of default or churn
+- **Resource Allocation**: Supports targeted intervention strategies for high-risk segments
+- **Model Training**: Provides labeled data for supervised learning in absence of explicit default labels
+- **Monitoring**: RFM metrics can be recalculated periodically to track customer engagement changes
+
+✅ **Known Limitations:**
+
+- **Proxy Nature**: The target is a proxy for credit risk, not actual default labels. Model performance should be validated against real outcomes when available.
+- **Temporal Assumptions**: Assumes that disengagement patterns are predictive of credit risk, which may vary by business context.
+- **Cluster Stability**: Cluster assignments may shift with new data; periodic recalibration recommended.
+- **Feature Dependency**: Proxy quality depends on transaction data quality and completeness.
+
+**Deliverable:** Complete proxy target engineering implementation in `src/data_processing.py` with `create_proxy_target_variable()` method, processed dataset with `is_high_risk` column saved to `data/processed/`, and comprehensive documentation of methodology, results, and limitations.
+
+---
+
 ## 📊 Usage Guide
 
 ### Running the EDA
@@ -391,6 +487,34 @@ Execute all cells sequentially to perform the complete exploratory data analysis
 
 ### Data Processing
 
+**Creating Proxy Target Variable (Task 4):**
+
+```python
+from src.data_processing import DataProcessor
+
+# Initialize processor
+processor = DataProcessor(data_path="data/raw")
+
+# Load raw data
+df = processor.load_data("credit_data.csv")
+
+# Create proxy target variable using RFM analysis
+df_with_target = processor.create_proxy_target_variable(
+    df=df,
+    snapshot_date=None,  # Uses max transaction date if None
+    customer_id_col="CustomerId",
+    transaction_date_col="TransactionStartTime",
+    amount_col="Amount",
+    n_clusters=3,
+    random_state=42,
+)
+
+# Save dataset with proxy target
+df_with_target.to_csv("data/processed/credit_data_with_proxy_target.csv", index=False)
+```
+
+**Feature Engineering Pipeline:**
+
 The feature engineering pipeline automatically handles all transformations:
 
 ```python
@@ -399,12 +523,12 @@ from src.data_processing import DataProcessor
 # Initialize processor
 processor = DataProcessor(
     data_path="data/raw",
-    target_column="FraudResult",
+    target_column="is_high_risk",  # Use proxy target from Task 4
     use_woe=True,  # Enable WoE transformations
 )
 
-# Load raw data
-df = processor.load_data("credit_data.csv")
+# Load data with proxy target
+df = processor.load_data("credit_data_with_proxy_target.csv")
 
 # Preprocess with full feature engineering pipeline
 # fit_pipeline=True for training, False for inference
@@ -589,7 +713,3 @@ This project is licensed under the MIT License.
 - Scikit-learn for machine learning tools
 - FastAPI for the API framework
 - All contributors and maintainers
-
----
-
-**Note**: Update feature names in `src/api/pydantic_models.py` and `src/data_processing.py` to match your actual dataset features.
