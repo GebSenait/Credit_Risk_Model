@@ -1,6 +1,7 @@
 """
 Prediction Module for Credit Risk Model
 Handles model loading and making predictions
+Supports loading from local files (joblib) or MLflow model registry
 """
 
 import logging
@@ -9,6 +10,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import joblib
+import mlflow
+import mlflow.pyfunc
 import numpy as np
 import pandas as pd
 
@@ -21,14 +24,16 @@ logger = logging.getLogger(__name__)
 class CreditRiskPredictor:
     """Class for making credit risk predictions"""
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, use_mlflow: bool = False):
         """
         Initialize CreditRiskPredictor
 
         Args:
-            model_path: Path to the saved model file
+            model_path: Path to the saved model file or MLflow model URI
+            use_mlflow: If True, load model from MLflow registry (model_path should be model URI)
         """
-        self.model_path = Path(model_path)
+        self.model_path = model_path
+        self.use_mlflow = use_mlflow
         self.model = None
         self.feature_names = None
         self.processor = DataProcessor()
@@ -36,22 +41,36 @@ class CreditRiskPredictor:
 
     def _load_model(self):
         """Load the trained model and feature names"""
-        if not self.model_path.exists():
-            raise FileNotFoundError(f"Model file not found: {self.model_path}")
-
-        logger.info(f"Loading model from {self.model_path}")
-        self.model = joblib.load(self.model_path)
-
-        # Load feature names
-        feature_path = self.model_path.parent / f"{self.model_path.stem}_features.pkl"
-        if feature_path.exists():
-            with open(feature_path, "rb") as f:
-                self.feature_names = pickle.load(f)
-            logger.info(f"Loaded {len(self.feature_names)} feature names")
+        if self.use_mlflow:
+            # Load from MLflow model registry
+            logger.info(f"Loading model from MLflow: {self.model_path}")
+            try:
+                self.model = mlflow.pyfunc.load_model(self.model_path)
+                logger.info("Model loaded successfully from MLflow")
+                # MLflow models may have feature names stored, try to extract
+                # Note: For sklearn models in MLflow, feature names need to be loaded separately
+            except Exception as e:
+                logger.error(f"Failed to load model from MLflow: {e}")
+                raise
         else:
-            logger.warning(
-                "Feature names file not found. Predictions may fail if feature mismatch occurs."
-            )
+            # Load from local file
+            model_path_obj = Path(self.model_path)
+            if not model_path_obj.exists():
+                raise FileNotFoundError(f"Model file not found: {model_path_obj}")
+
+            logger.info(f"Loading model from {model_path_obj}")
+            self.model = joblib.load(model_path_obj)
+
+            # Load feature names
+            feature_path = model_path_obj.parent / f"{model_path_obj.stem}_features.pkl"
+            if feature_path.exists():
+                with open(feature_path, "rb") as f:
+                    self.feature_names = pickle.load(f)
+                logger.info(f"Loaded {len(self.feature_names)} feature names")
+            else:
+                logger.warning(
+                    "Feature names file not found. Predictions may fail if feature mismatch occurs."
+                )
 
     def preprocess_input(self, data: Union[pd.DataFrame, Dict]) -> pd.DataFrame:
         """

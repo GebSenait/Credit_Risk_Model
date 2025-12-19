@@ -12,6 +12,7 @@ A production-ready machine learning project for credit risk prediction, featurin
   - [Task 2: Exploratory Data Analysis (EDA)](#task-2-exploratory-data-analysis-eda)
   - [Task 3: Feature Engineering](#task-3-feature-engineering)
   - [Task 4: Proxy Target Variable Engineering](#task-4-proxy-target-variable-engineering)
+  - [Task 5: Model Training, Tracking, and Validation](#task-5-model-training-tracking-and-validation)
 - [Usage Guide](#usage-guide)
 - [Testing](#testing)
 - [Deployment](#deployment)
@@ -475,6 +476,150 @@ The implementation successfully identifies customer segments with distinct engag
 
 ---
 
+### Task 5: Model Training, Tracking, and Validation
+
+#### Problem Statement
+
+Develop a structured, reproducible machine learning workflow that supports multiple model training, hyperparameter optimization, experiment tracking, and model comparison in a regulated analytics environment. The solution must enable systematic model evaluation, versioning, and selection of the best-performing model for deployment.
+
+#### Solution Approach
+
+Implemented a comprehensive model training pipeline using MLflow for experiment tracking and model registry, supporting multiple algorithms (Logistic Regression, Decision Tree, Random Forest, XGBoost) with automated hyperparameter tuning. The pipeline ensures full reproducibility through fixed random states, systematic evaluation using multiple metrics, and automatic selection of the best-performing model based on test set performance.
+
+#### Implementation Details
+
+**Model Training Pipeline (`src/train.py`):**
+
+The training workflow follows a structured, multi-stage process:
+
+1. **Data Loading and Splitting**
+   - Loads processed dataset from `data/processed/credit_data_with_proxy_target.csv`
+   - Applies feature engineering pipeline with WoE transformations
+   - Stratified train-test split (80/20) with fixed `random_state=42` for reproducibility
+   - Ensures balanced target distribution across splits
+
+2. **Multiple Model Training**
+   - **Logistic Regression**: Grid search over regularization strength (C), penalty types (L1/L2), and solvers
+   - **Decision Tree**: Grid search over max depth, min samples split, min samples leaf, and splitting criteria
+   - **Random Forest**: Randomized search over ensemble size, tree depth, and feature sampling strategies
+   - **XGBoost**: Randomized search over boosting parameters (learning rate, depth, subsample, colsample_bytree)
+   - All models use 5-fold stratified cross-validation for hyperparameter selection
+
+3. **Hyperparameter Tuning**
+   - Grid Search CV for Logistic Regression and Decision Tree (comprehensive search)
+   - Randomized Search CV for Random Forest and XGBoost (efficient search over larger parameter spaces)
+   - ROC-AUC used as primary optimization metric for all models
+   - Cross-validation ensures robust parameter selection
+
+4. **Comprehensive Model Evaluation**
+   - All models evaluated on both training and test sets using:
+     - **Accuracy**: Overall prediction correctness
+     - **Precision**: Ability to avoid false positives (critical for risk assessment)
+     - **Recall**: Ability to identify all high-risk cases
+     - **F1 Score**: Harmonic mean of precision and recall
+     - **ROC-AUC**: Discriminative power across classification thresholds
+   - Metrics calculated consistently across all models for fair comparison
+
+5. **MLflow Experiment Tracking**
+   - All experiments logged to MLflow with:
+     - Model parameters (including best hyperparameters from tuning)
+     - All evaluation metrics (training and test performance)
+     - Model artifacts (serialized models for reproducibility)
+     - Feature metadata (number of features, feature names)
+   - Experiments organized under "credit_risk_modeling" experiment
+   - Each model run uniquely identified for easy comparison
+
+6. **Model Comparison and Selection**
+   - Automatic comparison of all trained models
+   - Best model selected based on test set ROC-AUC (primary metric)
+   - Comprehensive performance summary logged for all models
+   - Clear identification of best-performing model with visual markers
+
+7. **Model Registry and Versioning**
+   - Best model automatically registered in MLflow Model Registry
+   - Model versioning enables tracking of model evolution
+   - Model URI stored for easy deployment and inference
+   - Local model backup saved to `models/credit_risk_model.pkl`
+
+**Key Features:**
+- **Reproducibility**: Fixed random states at all levels (data splitting, model training, hyperparameter search)
+- **Comprehensive Evaluation**: Multiple metrics provide holistic view of model performance
+- **Automated Workflow**: Single command trains all models, compares them, and registers the best
+- **Experiment Tracking**: Complete audit trail of all model experiments
+- **Model Registry**: Versioned model storage for production deployment
+
+#### Results & Insights
+
+✅ **Model Training Completed:**
+
+Successfully trained and evaluated four model types:
+- Logistic Regression: Baseline linear model with regularization
+- Decision Tree: Interpretable tree-based model
+- Random Forest: Ensemble method combining multiple trees
+- XGBoost: Gradient boosting model with advanced regularization
+
+✅ **Key Findings:**
+
+1. **Hyperparameter Impact**
+   - Optimal hyperparameters vary significantly across model types
+   - Cross-validation critical for robust parameter selection
+   - Randomized search efficiently explores large parameter spaces for ensemble methods
+
+2. **Model Performance Comparison**
+   - Tree-based models (Random Forest, XGBoost) typically outperform linear models for complex patterns
+   - Ensemble methods show better generalization and robustness
+   - Trade-offs exist between interpretability (Decision Tree) and performance (XGBoost/Random Forest)
+
+3. **Evaluation Metrics Insights**
+   - ROC-AUC provides threshold-independent performance assessment
+   - Precision-recall balance critical for risk models (avoiding false positives while capturing true risks)
+   - F1 score provides balanced view when class distribution is imbalanced
+   - All metrics logged for comprehensive performance assessment
+
+4. **Reproducibility Verification**
+   - Fixed random states ensure identical results across runs
+   - MLflow tracking enables complete experiment reproducibility
+   - All parameters and metrics logged for audit trail
+
+5. **Best Model Selection**
+   - Best model identified through systematic comparison
+   - Selection criteria: Test set ROC-AUC (primary), balanced with other metrics
+   - Model registered in MLflow for production deployment
+
+✅ **Performance Characteristics:**
+
+- **Best Model**: Selected based on test set ROC-AUC performance
+- **Model Comparison**: All models evaluated on identical train-test split
+- **Cross-Validation**: Hyperparameters optimized using 5-fold stratified CV
+- **Generalization**: Test set performance validated model robustness
+
+✅ **Technical Achievements:**
+
+- Production-ready training pipeline with MLflow integration
+- Automated hyperparameter tuning for all model types
+- Comprehensive evaluation framework with multiple metrics
+- Model registry integration for versioned model storage
+- Full reproducibility through fixed random states and logged parameters
+
+✅ **Deployment Readiness:**
+
+- Best model registered in MLflow Model Registry
+- Model artifacts saved for inference compatibility
+- Feature names persisted for preprocessing consistency
+- Predict module updated to support both local and MLflow model loading
+- Complete experiment tracking enables model comparison and selection
+
+✅ **Known Limitations:**
+
+- **Proxy Target**: Model performance based on proxy target variable (disengagement-based), not actual defaults. Performance should be validated against real outcomes when available.
+- **Computational Cost**: Full hyperparameter search can be time-intensive for large datasets; consider reducing search space or using early stopping for production workflows.
+- **Class Imbalance**: Current implementation uses stratified sampling; additional techniques (SMOTE, class weights) may improve performance if severe imbalance exists.
+- **Feature Dependency**: Model performance depends on quality of feature engineering pipeline; periodic feature review recommended.
+
+**Deliverable:** Complete model training pipeline in `src/train.py` with MLflow experiment tracking, hyperparameter tuning for multiple models, comprehensive evaluation metrics, best model selection and registry, and updated unit tests validating data processing components.
+
+---
+
 ## 📊 Usage Guide
 
 ### Running the EDA
@@ -552,21 +697,58 @@ The pipeline automatically:
 
 ### Model Training
 
+**Training with MLflow Tracking (Task 5):**
+
 ```bash
 python src/train.py
 ```
 
-Or programmatically:
+This will:
+- Load processed data with proxy target variable
+- Train multiple models (Logistic Regression, Decision Tree, Random Forest, XGBoost)
+- Perform hyperparameter tuning for each model
+- Log all experiments to MLflow
+- Compare models and select the best one
+- Register best model in MLflow Model Registry
+- Save best model locally to `models/credit_risk_model.pkl`
+
+**View MLflow Experiments:**
+
+```bash
+mlflow ui
+```
+
+Navigate to `http://localhost:5000` to view experiments, compare runs, and access the model registry.
+
+**Programmatic Training:**
+
 ```python
 from src.train import ModelTrainer
-from src.data_processing import DataProcessor
 
-processor = DataProcessor()
-df = processor.load_data("credit_data.csv")
-X, y = processor.preprocess(df, target_column='FraudResult')
+# Initialize trainer
+trainer = ModelTrainer(
+    experiment_name="credit_risk_modeling",
+    random_state=42
+)
 
-trainer = ModelTrainer(model_type='random_forest', n_estimators=100)
-metrics = trainer.train(X, y)
+# Load and split data
+trainer.load_and_split_data(
+    data_path="data/processed/credit_data_with_proxy_target.csv",
+    target_column="is_high_risk",
+    test_size=0.2,
+    use_woe=True
+)
+
+# Train all models
+trainer.train_all_models()
+
+# Compare and select best model
+best_model_name, best_model, best_metrics = trainer.compare_models_and_select_best()
+
+# Register best model
+model_uri = trainer.register_best_model(model_name="credit_risk_model")
+
+# Save model locally
 trainer.save_model("models/credit_risk_model.pkl")
 ```
 
