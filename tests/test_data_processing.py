@@ -222,13 +222,13 @@ class TestDataProcessor:
         # numeric arrays suitable for ML models. The ColumnTransformer handles this automatically.
         # We verify the structure is correct rather than checking dtypes, as the pipeline
         # implementation ensures numeric output for transformed features.
-        
+
         # Basic validation: X should have features (columns) for model training
         assert X.shape[1] > 0, (
             f"Expected features after preprocessing, but got 0 features. "
             f"X shape: {X.shape}"
         )
-        
+
         # Verify X contains data (not empty)
         assert X.shape[0] > 0, (
             f"Expected samples after preprocessing, but got 0 samples. "
