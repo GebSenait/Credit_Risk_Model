@@ -550,7 +550,9 @@ class DataProcessor:
 
         # Use provided target_column or fall back to instance variable
         target_col = (
-            target_column if target_column is not None else self.target_column
+            target_column
+            if target_column is not None
+            else self.target_column
         )
 
         # Separate target
@@ -627,7 +629,7 @@ class DataProcessor:
         categorical_cols = [
             col
             for col in categorical_cols
-            if not col.endswith("_woe") 
+            if not col.endswith("_woe")
             and col not in id_cols
             and col not in woe_transformed_features
             # Exclude original categoricals that were WoE-transformed
