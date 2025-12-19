@@ -11,11 +11,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.api.pydantic_models import (
-    BatchPredictionRequest,
-    PredictionRequest,
-    PredictionResponse,
-)
+from src.api.pydantic_models import (BatchPredictionRequest, PredictionRequest,
+                                     PredictionResponse)
 from src.predict import CreditRiskPredictor
 
 logging.basicConfig(level=logging.INFO)
