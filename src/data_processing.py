@@ -83,7 +83,7 @@ class CustomerAggregateFeatures(BaseEstimator, TransformerMixin):
         )
 
         # Fill NaN std values (for customers with single transaction) with 0
-        self.agg_features_.fillna(0, inplace=True)
+        self.agg_features_ = self.agg_features_.fillna(0)
 
         logger.info(
             f"Computed aggregate features for {len(self.agg_features_)} "
@@ -521,7 +521,7 @@ class DataProcessor:
         preprocessor = ColumnTransformer(
             transformers=transformers,
             remainder="passthrough",  # Pass through other columns (IDs, etc.)
-            verbose_feature_names_out=False,
+            verbose_feature_names_out=True,  # Required to avoid duplicate feature names
         )
 
         return Pipeline([("preprocessor", preprocessor)])
@@ -723,7 +723,8 @@ class DataProcessor:
         numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
             if df_clean[col].isnull().sum() > 0:
-                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+                median_val = df_clean[col].median()
+                df_clean[col] = df_clean[col].fillna(median_val)
 
         # For categorical columns, fill with mode
         categorical_cols = df_clean.select_dtypes(include=["object"]).columns
@@ -731,7 +732,7 @@ class DataProcessor:
             if df_clean[col].isnull().sum() > 0:
                 mode_value = df_clean[col].mode()
                 fill_value = mode_value[0] if len(mode_value) > 0 else "Unknown"
-                df_clean[col].fillna(fill_value, inplace=True)
+                df_clean[col] = df_clean[col].fillna(fill_value)
 
         return df_clean
 
