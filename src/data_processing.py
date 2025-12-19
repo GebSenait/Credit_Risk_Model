@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
@@ -21,7 +22,6 @@ from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
 )
-from sklearn.cluster import KMeans
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO)
