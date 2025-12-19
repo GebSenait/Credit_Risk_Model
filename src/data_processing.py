@@ -710,7 +710,9 @@ class DataProcessor:
                 f"Missing required columns for RFM analysis: {missing_cols}"
             )
 
-        logger.info(f"Calculating RFM metrics for {df_work[customer_id_col].nunique()} unique customers...")
+        logger.info(
+            f"Calculating RFM metrics for {df_work[customer_id_col].nunique()} unique customers..."
+        )
 
         # Convert transaction date to datetime
         df_work[transaction_date_col] = pd.to_datetime(
@@ -768,15 +770,21 @@ class DataProcessor:
             rfm_df["Recency"] = rfm_df["Recency"].fillna(rfm_df["Recency"].median())
 
         logger.info("RFM Metrics Summary:")
-        logger.info(f"  Recency: mean={rfm_df['Recency'].mean():.2f}, "
-                   f"median={rfm_df['Recency'].median():.2f}, "
-                   f"std={rfm_df['Recency'].std():.2f}")
-        logger.info(f"  Frequency: mean={rfm_df['Frequency'].mean():.2f}, "
-                   f"median={rfm_df['Frequency'].median():.2f}, "
-                   f"std={rfm_df['Frequency'].std():.2f}")
-        logger.info(f"  Monetary: mean={rfm_df['Monetary'].mean():.2f}, "
-                   f"median={rfm_df['Monetary'].median():.2f}, "
-                   f"std={rfm_df['Monetary'].std():.2f}")
+        logger.info(
+            f"  Recency: mean={rfm_df['Recency'].mean():.2f}, "
+            f"median={rfm_df['Recency'].median():.2f}, "
+            f"std={rfm_df['Recency'].std():.2f}"
+        )
+        logger.info(
+            f"  Frequency: mean={rfm_df['Frequency'].mean():.2f}, "
+            f"median={rfm_df['Frequency'].median():.2f}, "
+            f"std={rfm_df['Frequency'].std():.2f}"
+        )
+        logger.info(
+            f"  Monetary: mean={rfm_df['Monetary'].mean():.2f}, "
+            f"median={rfm_df['Monetary'].median():.2f}, "
+            f"std={rfm_df['Monetary'].std():.2f}"
+        )
 
         # Prepare RFM features for clustering
         rfm_features = rfm_df[["Recency", "Frequency", "Monetary"]].copy()
@@ -827,22 +835,32 @@ class DataProcessor:
         # Identify high-risk cluster: highest recency, lowest frequency, lowest monetary
         # Normalize each metric to [0, 1] range for fair comparison
         recency_norm = (
-            (cluster_summary_df["Recency_mean"] - cluster_summary_df["Recency_mean"].min())
-            / (cluster_summary_df["Recency_mean"].max() - cluster_summary_df["Recency_mean"].min() + 1e-10)
+            cluster_summary_df["Recency_mean"]
+            - cluster_summary_df["Recency_mean"].min()
+        ) / (
+            cluster_summary_df["Recency_mean"].max()
+            - cluster_summary_df["Recency_mean"].min()
+            + 1e-10
         )
-        frequency_norm = (
-            1 - (cluster_summary_df["Frequency_mean"] - cluster_summary_df["Frequency_mean"].min())
-            / (cluster_summary_df["Frequency_mean"].max() - cluster_summary_df["Frequency_mean"].min() + 1e-10)
+        frequency_norm = 1 - (
+            cluster_summary_df["Frequency_mean"]
+            - cluster_summary_df["Frequency_mean"].min()
+        ) / (
+            cluster_summary_df["Frequency_mean"].max()
+            - cluster_summary_df["Frequency_mean"].min()
+            + 1e-10
         )  # Inverted: lower frequency = higher risk
-        monetary_norm = (
-            1 - (cluster_summary_df["Monetary_mean"] - cluster_summary_df["Monetary_mean"].min())
-            / (cluster_summary_df["Monetary_mean"].max() - cluster_summary_df["Monetary_mean"].min() + 1e-10)
+        monetary_norm = 1 - (
+            cluster_summary_df["Monetary_mean"]
+            - cluster_summary_df["Monetary_mean"].min()
+        ) / (
+            cluster_summary_df["Monetary_mean"].max()
+            - cluster_summary_df["Monetary_mean"].min()
+            + 1e-10
         )  # Inverted: lower monetary = higher risk
 
         # Composite risk score: higher = more disengaged = higher risk
-        cluster_summary_df["Risk_Score"] = (
-            recency_norm + frequency_norm + monetary_norm
-        )
+        cluster_summary_df["Risk_Score"] = recency_norm + frequency_norm + monetary_norm
 
         high_risk_cluster = cluster_summary_df.loc[
             cluster_summary_df["Risk_Score"].idxmax(), "Cluster"
