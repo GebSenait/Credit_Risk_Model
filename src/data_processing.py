@@ -32,9 +32,7 @@ class CustomerAggregateFeatures(BaseEstimator, TransformerMixin):
     Transformer to create customer-level aggregate features
     """
 
-    def __init__(
-        self, customer_id_col: str = "CustomerId", amount_col: str = "Amount"
-    ):
+    def __init__(self, customer_id_col: str = "CustomerId", amount_col: str = "Amount"):
         """
         Initialize CustomerAggregateFeatures
 
@@ -243,9 +241,7 @@ class WoETransformer(BaseEstimator, TransformerMixin):
         # Calculate WoE for each categorical feature
         for feature in self.categorical_features:
             if feature not in X.columns:
-                logger.warning(
-                    f"Feature '{feature}' not found in DataFrame. Skipping."
-                )
+                logger.warning(f"Feature '{feature}' not found in DataFrame. Skipping.")
                 continue
 
             if feature == self.target_col:
@@ -549,9 +545,7 @@ class DataProcessor:
         logger.info("Starting comprehensive feature engineering pipeline...")
 
         # Use provided target_column or fall back to instance variable
-        target_col = (
-            target_column if target_column is not None else self.target_column
-        )
+        target_col = target_column if target_column is not None else self.target_column
 
         # Separate target
         if target_col not in df.columns:
@@ -652,9 +646,9 @@ class DataProcessor:
         X_transformed = self.feature_pipeline_.transform(X)
 
         # Convert to DataFrame with feature names
-        feature_names = (
-            self.feature_pipeline_.named_steps["preprocessor"].get_feature_names_out()
-        )
+        feature_names = self.feature_pipeline_.named_steps[
+            "preprocessor"
+        ].get_feature_names_out()
         X_transformed_df = pd.DataFrame(
             X_transformed, columns=feature_names, index=X.index
         )
