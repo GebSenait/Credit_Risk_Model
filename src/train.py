@@ -3,21 +3,18 @@ Training Module for Credit Risk Model
 Handles model training, validation, and saving
 """
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from typing import Dict, Any, Optional
-import pickle
 import logging
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    roc_auc_score,
-    accuracy_score,
-)
+import pickle
+from pathlib import Path
+from typing import Any, Dict, Optional
+
 import joblib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix, roc_auc_score)
+from sklearn.model_selection import train_test_split
 
 from src.data_processing import DataProcessor
 

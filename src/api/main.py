@@ -3,19 +3,17 @@ FastAPI Application for Credit Risk Model
 Provides REST API endpoints for model predictions
 """
 
+import logging
+from pathlib import Path
+from typing import Any, Dict, List
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any
-import logging
-from pathlib import Path
 
+from src.api.pydantic_models import (BatchPredictionRequest, PredictionRequest,
+                                     PredictionResponse)
 from src.predict import CreditRiskPredictor
-from src.api.pydantic_models import (
-    PredictionRequest,
-    PredictionResponse,
-    BatchPredictionRequest,
-)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

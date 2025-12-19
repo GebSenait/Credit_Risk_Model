@@ -3,13 +3,14 @@ Prediction Module for Credit Risk Model
 Handles model loading and making predictions
 """
 
-import pandas as pd
-import numpy as np
+import logging
+import pickle
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-import logging
+
 import joblib
-import pickle
+import numpy as np
+import pandas as pd
 
 from src.data_processing import DataProcessor
 
