@@ -3,8 +3,9 @@ Pydantic Models for Credit Risk API
 Defines request and response schemas
 """
 
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, List
 
 
 class PredictionRequest(BaseModel):
