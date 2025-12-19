@@ -32,7 +32,9 @@ class CustomerAggregateFeatures(BaseEstimator, TransformerMixin):
     Transformer to create customer-level aggregate features
     """
 
-    def __init__(self, customer_id_col: str = "CustomerId", amount_col: str = "Amount"):
+    def __init__(
+        self, customer_id_col: str = "CustomerId", amount_col: str = "Amount"
+    ):
         """
         Initialize CustomerAggregateFeatures
 
@@ -54,13 +56,15 @@ class CustomerAggregateFeatures(BaseEstimator, TransformerMixin):
         """
         if self.customer_id_col not in X.columns:
             logger.warning(
-                f"Customer ID column '{self.customer_id_col}' not found. Skipping aggregate features."
+                f"Customer ID column '{self.customer_id_col}' not found. "
+                "Skipping aggregate features."
             )
             return self
 
         if self.amount_col not in X.columns:
             logger.warning(
-                f"Amount column '{self.amount_col}' not found. Skipping aggregate features."
+                f"Amount column '{self.amount_col}' not found. "
+                "Skipping aggregate features."
             )
             return self
 
@@ -82,7 +86,8 @@ class CustomerAggregateFeatures(BaseEstimator, TransformerMixin):
         self.agg_features_.fillna(0, inplace=True)
 
         logger.info(
-            f"Computed aggregate features for {len(self.agg_features_)} unique customers"
+            f"Computed aggregate features for {len(self.agg_features_)} "
+            "unique customers"
         )
         return self
 
@@ -108,7 +113,11 @@ class CustomerAggregateFeatures(BaseEstimator, TransformerMixin):
             )
 
         # Fill any remaining NaN (for new customers not seen in training) with 0
-        agg_cols = [col for col in X_transformed.columns if col.startswith(self.customer_id_col + "_")]
+        agg_cols = [
+            col
+            for col in X_transformed.columns
+            if col.startswith(self.customer_id_col + "_")
+        ]
         for col in agg_cols:
             X_transformed[col] = X_transformed[col].fillna(0)
 
@@ -153,7 +162,8 @@ class TemporalFeatureExtractor(BaseEstimator, TransformerMixin):
 
         if self.timestamp_col not in X.columns:
             logger.warning(
-                f"Timestamp column '{self.timestamp_col}' not found. Skipping temporal features."
+                f"Timestamp column '{self.timestamp_col}' not found. "
+                "Skipping temporal features."
             )
             return X_transformed
 
@@ -193,7 +203,9 @@ class WoETransformer(BaseEstimator, TransformerMixin):
     WoE = ln((% of non-events in category) / (% of events in category))
     """
 
-    def __init__(self, categorical_features: List[str], target_col: Optional[str] = None):
+    def __init__(
+        self, categorical_features: List[str], target_col: Optional[str] = None
+    ):
         """
         Initialize WoETransformer
 
@@ -214,7 +226,9 @@ class WoETransformer(BaseEstimator, TransformerMixin):
             y: Target Series (required for WoE calculation)
         """
         if y is None and self.target_col is None:
-            logger.warning("No target provided. WoE transformation requires target variable.")
+            logger.warning(
+                "No target provided. WoE transformation requires target variable."
+            )
             return self
 
         # Get target from y parameter or X DataFrame
@@ -229,7 +243,9 @@ class WoETransformer(BaseEstimator, TransformerMixin):
         # Calculate WoE for each categorical feature
         for feature in self.categorical_features:
             if feature not in X.columns:
-                logger.warning(f"Feature '{feature}' not found in DataFrame. Skipping.")
+                logger.warning(
+                    f"Feature '{feature}' not found in DataFrame. Skipping."
+                )
                 continue
 
             if feature == self.target_col:
@@ -297,11 +313,15 @@ class WoETransformer(BaseEstimator, TransformerMixin):
 
             woe_dict = self.woe_dicts_[feature]
             # Replace categories with WoE values, default to 0 for unseen categories
-            X_transformed[feature + "_woe"] = X_transformed[feature].map(woe_dict).fillna(0.0)
+            X_transformed[feature + "_woe"] = (
+                X_transformed[feature].map(woe_dict).fillna(0.0)
+            )
 
         return X_transformed
 
-    def calculate_iv(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> Dict[str, float]:
+    def calculate_iv(
+        self, X: pd.DataFrame, y: Optional[pd.Series] = None
+    ) -> Dict[str, float]:
         """
         Calculate Information Value (IV) for each transformed feature
 
@@ -366,7 +386,8 @@ class DataProcessor:
             data_path: Path to the data directory
             target_column: Name of the target column
             use_woe: Whether to apply WoE transformations
-            use_label_encoding: Whether to use label encoding for high-cardinality categoricals
+            use_label_encoding: Whether to use label encoding for
+                high-cardinality categoricals
         """
         self.data_path = Path(data_path) if data_path else Path("data/raw")
         self.processed_data = None
@@ -398,7 +419,9 @@ class DataProcessor:
 
         return df
 
-    def _identify_feature_types(self, df: pd.DataFrame) -> Tuple[List[str], List[str], List[str]]:
+    def _identify_feature_types(
+        self, df: pd.DataFrame
+    ) -> Tuple[List[str], List[str], List[str]]:
         """
         Identify numerical, categorical, and ID columns
 
@@ -436,11 +459,17 @@ class DataProcessor:
         if "TransactionStartTime" in df.columns:
             timestamp_cols = ["TransactionStartTime"]
 
-        logger.info(f"Identified {len(numerical_cols)} numerical, {len(categorical_cols)} categorical features")
+        logger.info(
+            f"Identified {len(numerical_cols)} numerical, "
+            f"{len(categorical_cols)} categorical features"
+        )
         return numerical_cols, categorical_cols, id_cols
 
     def _create_feature_pipeline(
-        self, numerical_cols: List[str], categorical_cols: List[str], y: Optional[pd.Series] = None
+        self,
+        numerical_cols: List[str],
+        categorical_cols: List[str],
+        y: Optional[pd.Series] = None,
     ) -> Pipeline:
         """
         Create sklearn Pipeline for feature engineering
@@ -476,7 +505,14 @@ class DataProcessor:
             categorical_pipeline = Pipeline(
                 [
                     ("imputer", SimpleImputer(strategy="most_frequent")),
-                    ("onehot", OneHotEncoder(drop="first", sparse_output=False, handle_unknown="ignore")),
+                    (
+                        "onehot",
+                        OneHotEncoder(
+                            drop="first",
+                            sparse_output=False,
+                            handle_unknown="ignore",
+                        ),
+                    ),
                 ]
             )
             transformers.append(("categorical", categorical_pipeline, categorical_cols))
@@ -494,11 +530,13 @@ class DataProcessor:
         self, df: pd.DataFrame, fit_pipeline: bool = True
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
-        Preprocess data for model training using comprehensive feature engineering pipeline
+        Preprocess data for model training using comprehensive feature engineering
+        pipeline
 
         Args:
             df: Input DataFrame
-            fit_pipeline: Whether to fit the pipeline (True for training, False for inference)
+            fit_pipeline: Whether to fit the pipeline (True for training,
+                False for inference)
 
         Returns:
             Tuple of (features DataFrame, target Series)
@@ -530,7 +568,8 @@ class DataProcessor:
             logger.info("Step 3: Applying WoE transformations...")
             numerical_cols, categorical_cols, id_cols = self._identify_feature_types(X)
 
-            # Select suitable categorical features for WoE (exclude high-cardinality IDs)
+            # Select suitable categorical features for WoE
+            # (exclude high-cardinality IDs)
             woe_categoricals = [
                 col
                 for col in categorical_cols
@@ -567,19 +606,22 @@ class DataProcessor:
         if self.use_woe and self.woe_transformer_ is not None:
             woe_transformed_features = self.woe_transformer_.categorical_features
 
-        # Remove ID columns, WoE-transformed columns (they're now numerical via WoE), 
-        # and original categoricals that were WoE-transformed
+        # Remove ID columns, WoE-transformed columns (they're now numerical
+        # via WoE), and original categoricals that were WoE-transformed
         categorical_cols = [
             col
             for col in categorical_cols
             if not col.endswith("_woe") 
             and col not in id_cols
-            and col not in woe_transformed_features  # Exclude original categoricals that were WoE-transformed
+            and col not in woe_transformed_features
+            # Exclude original categoricals that were WoE-transformed
         ]
 
         # Add WoE columns and temporal features to numerical
         woe_cols = [col for col in X.columns if col.endswith("_woe")]
-        temporal_cols = [col for col in X.columns if col.startswith("TransactionStartTime_")]
+        temporal_cols = [
+            col for col in X.columns if col.startswith("TransactionStartTime_")
+        ]
         numerical_cols = numerical_cols + woe_cols + temporal_cols
 
         # Step 5: Create and fit/transform using sklearn pipeline
@@ -594,20 +636,27 @@ class DataProcessor:
         X_transformed = self.feature_pipeline_.transform(X)
 
         # Convert to DataFrame with feature names
-        feature_names = self.feature_pipeline_.named_steps["preprocessor"].get_feature_names_out()
+        feature_names = (
+            self.feature_pipeline_.named_steps["preprocessor"].get_feature_names_out()
+        )
         X_transformed_df = pd.DataFrame(X_transformed, columns=feature_names, index=X.index)
 
         # Store feature names
         self.feature_names_ = list(X_transformed_df.columns)
 
         logger.info(
-            f"Feature engineering completed: {X_transformed_df.shape[0]} samples, {X_transformed_df.shape[1]} features"
+            f"Feature engineering completed: {X_transformed_df.shape[0]} samples, "
+            f"{X_transformed_df.shape[1]} features"
         )
 
         return X_transformed_df, y
 
     def save_processed_data(
-        self, X: pd.DataFrame, y: pd.Series, filename: str, output_path: Optional[str] = None
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        filename: str,
+        output_path: Optional[str] = None,
     ):
         """
         Save processed data to CSV
@@ -646,7 +695,8 @@ class DataProcessor:
             Cleaned DataFrame
         """
         logger.warning(
-            "clean_data() is deprecated. Missing value handling is now part of the preprocessing pipeline."
+            "clean_data() is deprecated. Missing value handling is now part "
+            "of the preprocessing pipeline."
         )
         return df.copy()
 
@@ -662,6 +712,7 @@ class DataProcessor:
             DataFrame with engineered features
         """
         logger.warning(
-            "engineer_features() is deprecated. Feature engineering is now part of the preprocessing pipeline."
+            "engineer_features() is deprecated. Feature engineering is now "
+            "part of the preprocessing pipeline."
         )
         return df.copy()
